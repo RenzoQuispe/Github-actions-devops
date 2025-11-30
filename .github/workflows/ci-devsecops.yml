@@ -15,6 +15,11 @@ jobs:
       actions: read
       security-events: write
     steps:
+      - name: Saludo del pipeline
+        run: |
+          echo "Iniciando pipeline para el repositorio: $GITHUB_REPOSITORY"
+          echo "Rama detectada: $GITHUB_REF_NAME"
+          
       - name: Checkout
         uses: actions/checkout@v4
 
