@@ -156,6 +156,40 @@ jobs:
 
 ---
 
+## 5. Environments: reglas y protecciones
+
+Los **environments** no solo agrupan secrets y variables por entorno: permiten definir **protecciones** que deben cumplirse antes de que un job que use ese environment pueda ejecutarse o completarse. En DevSecOps son útiles para gates antes de staging o production.
+
+### Características
+
+- Un environment es un **nombre lógico** (p. ej. `staging`, `production`) que asocias a un job con `environment: nombre`.
+- Puedes configurar **protection rules**: ramas permitidas, revisores requeridos, wait timer.
+- Hasta que no se cumplan las reglas (aprobación, rama correcta, etc.), el job que usa ese environment **queda en espera** (pending).
+- Las **deployment branch** rules limitan desde qué ramas se puede "desplegar" a ese environment (GitHub muestra el deployment en la pestaña Deployments).
+
+### Utilidad
+
+- **Required reviewers**: que un humano apruebe antes de desplegar a production (gate de compliance).
+- **Wait timer**: retrasar el deploy X minutos para poder cancelar si algo salió mal.
+- **Deployment branches**: solo `main` (o `release/*`) puede desplegar a production; el resto solo a staging.
+- **DevSecOps**: separar claramente qué jobs tocan qué entorno y exigir aprobación o rama para prod.
+
+### Reglas disponibles (resumen)
+
+| Regla | Qué hace |
+|-------|----------|
+| **Required reviewers** | Una o más personas deben aprobar el job antes de que continúe. |
+| **Wait timer** | Esperar un tiempo (minutos) antes de que el job siga. |
+| **Deployment branches** | Solo las ramas que coincidan (p. ej. `main`) pueden usar este environment. |
+
+Los jobs que declaran `environment: production` pasan por estas reglas; los que no declaran `environment` no están sujetos a ellas.
+
+### Dónde configurarlo
+
+En el repo -> **Settings** -> **Environments** -> elegir un environment (o crear uno) -> **Protection rules**. Ahí activas required reviewers, wait timer y deployment branches.
+
+---
+
 ## Orden de precedencia (variables)
 
 Si el mismo **nombre** existe en varios sitios, GitHub resuelve así (el primero que exista gana):
@@ -164,7 +198,7 @@ Si el mismo **nombre** existe en varios sitios, GitHub resuelve así (el primero
 2. **Variable del environment** (si el job tiene `environment`).  
 3. **Repository variable**.  
 
-Los **secrets** no se “sobrescriben” por variables; son namespaces distintos (`secrets.*` vs `vars.*`). Lo que sí puede variar es qué secret está disponible según el environment (environment secret vs repository secret).
+Los **secrets** no se "sobrescriben" por variables; son namespaces distintos (`secrets.*` vs `vars.*`). Lo que sí puede variar es qué secret está disponible según el environment (environment secret vs repository secret).
 
 ---
 
@@ -184,5 +218,3 @@ Los **secrets** no se “sobrescriben” por variables; son namespaces distintos
   - Pestaña **Secrets**: Repository secrets.
   - Pestaña **Variables**: Repository variables.
 - **Environment**: **Settings** -> **Environments** -> elegir un environment (o crear uno) -> configurar ahí **Environment secrets** y **Environment variables**.
-
----
