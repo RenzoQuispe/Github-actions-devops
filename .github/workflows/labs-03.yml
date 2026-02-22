@@ -15,7 +15,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Zip code
-      run: zip function.zip labs/labs-03-pipelines-github-cloud/workflows/lab-03.1/index.js
+      run: |
+        cd labs/labs-03-pipelines-github-cloud/workflows/lab-03.1
+        zip -r ../../../../../function.zip .
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
