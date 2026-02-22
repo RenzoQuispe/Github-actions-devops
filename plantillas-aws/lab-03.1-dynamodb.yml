@@ -1,0 +1,56 @@
+# Lab 03.1: Tabla DynamoDB + política IAM para Lambda (Free Tier)
+# Despliega una vez; luego asocia la política al rol de tu Lambda (FuncionTest1).
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DynamoDB table lab03-events + IAM policy for Lambda (1 RCU/1 WCU = Free Tier)'
+
+Parameters:
+  LambdaRoleName:
+    Type: String
+    Default: ''
+    Description: '(Opcional) Nombre del rol IAM de tu Lambda para adjuntar la política automáticamente. Si está vacío, adjunta la política manualmente desde la consola.'
+
+Resources:
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: lab03-events
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: eventId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  LambdaDynamoDBPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: lab03-events-dynamodb-policy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:GetItem
+              - dynamodb:Scan
+              - dynamodb:Query
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+            Resource: !GetAtt EventsTable.Arn
+
+Outputs:
+  TableName:
+    Description: Nombre de la tabla DynamoDB
+    Value: !Ref EventsTable
+    Export:
+      Name: !Sub ${AWS::StackName}-TableName
+  PolicyArn:
+    Description: ARN de la política IAM; asígnala al rol de tu Lambda (FuncionTest1)
+    Value: !Ref LambdaDynamoDBPolicy
+    Export:
+      Name: !Sub ${AWS::StackName}-PolicyArn

@@ -1,0 +1,113 @@
+# Lab 03.1: IaC completo — DynamoDB + IAM + Lambda (Free Tier)
+# Una sola plantilla para aprovisionar todo. Luego el pipeline solo actualiza el código (update-function-code).
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lab 03.1 - DynamoDB, rol IAM y Lambda (putEvent/listEvents). Free Tier.'
+
+Parameters:
+  FunctionName:
+    Type: String
+    Default: lab03-1-function1
+    Description: Nombre de la función Lambda (usar este nombre en el workflow o en secret FUNCTION_NAME)
+  TableName:
+    Type: String
+    Default: lab03-1-table1
+    Description: Nombre de la tabla DynamoDB
+
+Resources:
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: eventId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-lambda-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+
+  LambdaRoleExecutionPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${AWS::StackName}-lambda-execution
+      Roles:
+        - !Ref LambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: '*'
+
+  LambdaRoleDynamoDBPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${AWS::StackName}-lambda-dynamodb
+      Roles:
+        - !Ref LambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:GetItem
+              - dynamodb:Scan
+              - dynamodb:Query
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+            Resource: !GetAtt EventsTable.Arn
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref FunctionName
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Timeout: 15
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref EventsTable
+      Code:
+        ZipFile: |
+          exports.handler = async () => ({
+            statusCode: 501,
+            body: JSON.stringify({ message: 'Código no desplegado aún. Ejecuta el workflow (push a labs-03) para actualizar la función.' })
+          });
+
+Outputs:
+  TableName:
+    Description: Nombre de la tabla DynamoDB
+    Value: !Ref EventsTable
+    Export:
+      Name: !Sub ${AWS::StackName}-TableName
+  FunctionName:
+    Description: Nombre de la función Lambda (usar en workflow o secret FUNCTION_NAME)
+    Value: !Ref LambdaFunction
+    Export:
+      Name: !Sub ${AWS::StackName}-FunctionName
+  FunctionArn:
+    Description: ARN de la función Lambda
+    Value: !GetAtt LambdaFunction.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-FunctionArn
