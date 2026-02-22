@@ -41,7 +41,7 @@ La plantilla crea en tu cuenta AWS:
 
 - Tabla **DynamoDB** (nombre por defecto `lab03-1-table1`, 1 RCU / 1 WCU, Free Tier).
 - Rol IAM con permisos de CloudWatch Logs y DynamoDB sobre esa tabla.
-- Función **Lambda** con runtime Node.js 20, variable de entorno `TABLE_NAME` y un handler inicial que devuelve **501** (código aún no desplegado).
+- Función **Lambda** con runtime Node.js 24, variable de entorno `TABLE_NAME` y un handler inicial que devuelve **501** (código aún no desplegado).
 
 ### 2. Secrets en GitHub
 

@@ -33,6 +33,12 @@ jobs:
           --capabilities CAPABILITY_NAMED_IAM \
           --no-fail-on-empty-changeset
 
+    - name: Install Lambda dependencies
+      run: |
+        LAMBDA_DIR="labs/labs-03-pipelines-github-cloud/lab-03.1"
+        cd $LAMBDA_DIR
+        npm install --omit=dev
+
     - name: Zip code
       run: |
         LAMBDA_DIR="labs/labs-03-pipelines-github-cloud/lab-03.1"

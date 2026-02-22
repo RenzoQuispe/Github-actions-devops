@@ -1,6 +1,8 @@
-const AWS = require('aws-sdk');
-const docClient = new AWS.DynamoDB.DocumentClient();
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 
+const client = new DynamoDBClient({});
+const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || 'lab03-1-table1';
 
 /**
@@ -21,10 +23,10 @@ exports.handler = async (event) => {
         timestamp: new Date().toISOString(),
         ...body,
       };
-      await docClient.put({
+      await docClient.send(new PutCommand({
         TableName: TABLE_NAME,
         Item: item,
-      }).promise();
+      }));
       return {
         statusCode: 200,
         body: JSON.stringify({
@@ -37,10 +39,10 @@ exports.handler = async (event) => {
 
     if (action === 'listEvents') {
       const limit = Math.min(Math.max(parseInt(body?.limit, 10) || 10, 1), 100);
-      const result = await docClient.scan({
+      const result = await docClient.send(new ScanCommand({
         TableName: TABLE_NAME,
         Limit: limit,
-      }).promise();
+      }));
       const items = (result.Items || []).sort(
         (a, b) => (b.timestamp || '').localeCompare(a.timestamp || '')
       );

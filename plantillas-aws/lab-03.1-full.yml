@@ -81,7 +81,7 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Ref FunctionName
-      Runtime: nodejs20.x
+      Runtime: nodejs24.x
       Handler: index.handler
       Timeout: 15
       Role: !GetAtt LambdaRole.Arn
