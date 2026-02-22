@@ -16,8 +16,14 @@ jobs:
 
     - name: Zip code
       run: |
-        cd labs/labs-03-pipelines-github-cloud/workflows/lab-03.1
-        zip -r ../../../../../function.zip .
+        LAMBDA_DIR="labs/labs-03-pipelines-github-cloud/workflows/lab-03.1"
+        cd $LAMBDA_DIR
+        zip -r $GITHUB_WORKSPACE/function.zip .
+
+    - name: Verify zip exists
+      run: |
+        ls -lh function.zip
+        unzip -l function.zip
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
