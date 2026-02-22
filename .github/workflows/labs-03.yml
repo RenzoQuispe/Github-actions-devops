@@ -52,17 +52,19 @@ jobs:
 
     - name: Invoke Lambda (escribir evento en DynamoDB)
       run: |
+        echo '{"action":"putEvent","body":{"eventType":"lab-run","source":"github-actions"}}' > payload-put.json
         aws lambda invoke \
           --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
-          --payload '{"action":"putEvent","body":{"eventType":"lab-run","source":"github-actions"}}' \
+          --payload fileb://payload-put.json \
           response-put.json
         cat response-put.json
 
     - name: Invoke Lambda (listar eventos desde DynamoDB)
       run: |
+        echo '{"action":"listEvents"}' > payload-list.json
         aws lambda invoke \
           --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
-          --payload '{"action":"listEvents"}' \
+          --payload fileb://payload-list.json \
           response-list.json
         cat response-list.json
 
