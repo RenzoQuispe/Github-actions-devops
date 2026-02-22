@@ -29,3 +29,11 @@ jobs:
         aws lambda update-function-code \
           --function-name FuncionTest1 \
           --zip-file fileb://function.zip
+
+    - name: Invoke Lambda
+      run: |
+        aws lambda invoke \
+          --function-name FuncionTest1 \
+          response.json
+
+    - run: cat response.json

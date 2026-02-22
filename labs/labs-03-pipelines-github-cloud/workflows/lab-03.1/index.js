@@ -3,6 +3,8 @@ export const handler = async (event) => {
     await new Promise(resolve => setTimeout(resolve, 3000));
     console.log("Inicio del proceso ...");
     await new Promise(resolve => setTimeout(resolve, 3000));
+    console.log("Ya casi llegamos al final ...");
+    await new Promise(resolve => setTimeout(resolve, 3000));
     const response = {
       statusCode: 200,
       body: JSON.stringify({
