@@ -49,12 +49,18 @@ jobs:
       run: |
         ls -lh function.zip
         unzip -l function.zip
+        echo "Contenido de index.js (debe usar @aws-sdk):"
+        unzip -p function.zip index.js | head -5
 
     - name: Deploy to Lambda
       run: |
         aws lambda update-function-code \
           --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
           --zip-file fileb://function.zip
+
+    - name: Esperar a que la Lambda termine de actualizarse
+      run: |
+        aws lambda wait function-updated --function-name ${{ env.LAMBDA_FUNCTION_NAME }}
 
     - name: Invoke Lambda (escribir evento en DynamoDB)
       run: |
