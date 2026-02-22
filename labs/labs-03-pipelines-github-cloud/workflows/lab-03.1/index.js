@@ -1,4 +1,4 @@
-export const handler = async (event) => {
+exports.handler = async (event) => {
     console.log("Hola desde AWS Lambda!");
     await new Promise(resolve => setTimeout(resolve, 3000));
     console.log("Inicio del proceso ...");
@@ -13,5 +13,5 @@ export const handler = async (event) => {
     })
     };
     return response;
-  };
+};
   
