@@ -10,7 +10,7 @@ Laboratorio con **AWS Lambda** y **DynamoDB**: la Lambda escribe y lista eventos
 
 ---
 
-## Opción A: Aprovisionar todo con IaC (recomendado)
+## Aprovisionar todo con IaC
 
 Una sola plantilla crea **DynamoDB**, **rol IAM** (logs + DynamoDB) y la **función Lambda**. La Lambda se crea con un handler placeholder (respuesta 501); el código real (putEvent/listEvents) lo despliega el **workflow** en cada push.
 
@@ -58,46 +58,3 @@ Haces **push a la rama `labs-03`**. El workflow:
 4. Invoca la Lambda con `putEvent` y con `listEvents` y verifica que respondan 200.
 
 Tras ese primer push, la función deja de devolver 501 y pasa a ejecutar el código del repo (putEvent/listEvents). En cada push posterior el workflow vuelve a desplegar la plantilla (si hay cambios) y a actualizar el código.
-
----
-
-## Opción B: Solo tabla y política (Lambda ya existente)
-
-Si ya tienes una Lambda (por ejemplo `FuncionTest1`) y solo quieres crear la tabla y los permisos:
-
-### 1. Desplegar tabla y política
-
-```bash
-aws cloudformation deploy \
-  --template-file plantillas-aws/lab-03.1-dynamodb.yml \
-  --stack-name lab03-events \
-  --capabilities CAPABILITY_NAMED_IAM
-```
-
-### 2. Asociar la política al rol de tu Lambda
-
-En **IAM** → Roles → rol de tu Lambda → Adjuntar políticas → **lab03-events-dynamodb-policy**.
-
-(O por CLI: `aws iam attach-role-policy --role-name TU_ROL --policy-arn arn:aws:iam::CUENTA:policy/lab03-events-dynamodb-policy`.)
-
-### 3. Secret FUNCTION_NAME
-
-En GitHub, configura el secret **FUNCTION_NAME** = nombre de tu función (ej. `FuncionTest1`). Si no lo configuras, el workflow usa por defecto `lab03-1-function1` (válido solo si desplegaste la plantilla completa).
-
-### 4. Variable de entorno en Lambda (opcional)
-
-Por defecto la Lambda usa la tabla **lab03-events**. Si usas otro nombre de tabla, añade en la función la variable **TABLE_NAME**.
-
----
-
-## Resumen
-
-| Qué quieres                         | Plantilla               | Secret FUNCTION_NAME      |
-|-------------------------------------|-------------------------|---------------------------|
-| Todo nuevo (DynamoDB + Lambda + IAM)| `lab-03.1-full.yml`     | Opcional (default: lab03-1-function1) |
-| Solo tabla + política (Lambda ya existe) | `lab-03.1-dynamodb.yml` | Tu nombre de función (ej. FuncionTest1) |
-
-## Free Tier
-
-- **Lambda**: 1M solicitudes/mes gratis.
-- **DynamoDB**: 25 GB y 25 RCU/WCU gratis; con 1 RCU y 1 WCU el uso típico de este lab es 0 €.
