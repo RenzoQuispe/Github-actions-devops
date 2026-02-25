@@ -102,11 +102,14 @@ jobs:
           npm install
 
       - name: Build frontend with API URL
-        env:
-          VITE_APP_API_URL: ${{ steps.outputs.api_url }}
         run: |
+          API_URL=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiURL'].OutputValue" \
+            --output text)
+          echo "Building frontend with API URL: $API_URL"
           cd labs/labs-03-pipelines-github-cloud/lab-03.2/frontend
-          echo "VITE_APP_API_URL=$VITE_APP_API_URL" >> .env.production
+          echo "VITE_APP_API_URL=$API_URL" > .env.production
           npm run build
 
       - name: Upload frontend to S3
