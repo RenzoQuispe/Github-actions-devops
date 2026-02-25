@@ -112,16 +112,30 @@ jobs:
 
       - name: Upload frontend to S3
         run: |
+          BUCKET=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
+            --output text)
+          [ -z "$BUCKET" ] && BUCKET=$(aws cloudformation list-stack-resources --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "StackResourceSummaries[?ResourceType=='AWS::S3::Bucket'].PhysicalResourceId" \
+            --output text | tr '\t' '\n' | head -1)
+          echo "Using bucket: $BUCKET"
           aws s3 sync \
             labs/labs-03-pipelines-github-cloud/lab-03.2/frontend/dist/ \
-            s3://${{ steps.outputs.bucket }}/ \
+            s3://$BUCKET/ \
             --delete \
             --cache-control "public, max-age=0, must-revalidate"
 
       - name: Invalidate CloudFront cache
         run: |
+          DIST_ID=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendDistributionId'].OutputValue" \
+            --output text)
+          echo "Invalidating CloudFront: $DIST_ID"
           aws cloudfront create-invalidation \
-            --distribution-id ${{ steps.outputs.distribution_id }} \
+            --distribution-id "$DIST_ID" \
             --paths "/*"
 
       - name: Summary
