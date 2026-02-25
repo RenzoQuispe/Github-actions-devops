@@ -267,6 +267,11 @@ Resources:
           CachedMethods:
             - GET
             - HEAD
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+            Headers: []
           Compress: true
           DefaultTTL: 0
           MaxTTL: 86400
