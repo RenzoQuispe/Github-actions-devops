@@ -14,9 +14,13 @@ Laboratorio con **AWS Lambda** y **DynamoDB**: la Lambda escribe y lista eventos
 
 Una sola plantilla crea **DynamoDB**, **rol IAM** (logs + DynamoDB) y la **función Lambda**. La Lambda se crea con un handler placeholder (respuesta 501); el código real (putEvent/listEvents) lo despliega el **workflow** en cada push.
 
-### 1. Desplegar la plantilla (manual o desde el pipeline)
+### 1. Política IAM para GitHub Actions
 
-**Desde el pipeline (recomendado):** En cada push a la rama `labs-03`, el workflow ejecuta `aws cloudformation deploy` con la plantilla `lab-03.1-full.yml` antes de actualizar el código de la Lambda. La primera vez crea el stack; en ejecuciones siguientes solo aplica cambios si la plantilla cambió. No hace falta desplegar la plantilla a mano.
+Crea una política en AWS a partir de `IAM_Policies_AWS.json` y asígnala al usuario cuyas credenciales usarás en los secrets. Crea después las **Access Key** de ese usuario en la consola IAM y guarda el Access Key ID y el Secret en los secrets del repo (`AWS_ACCESS_KEY` y `AWS_SECRET_KEY`).
+
+### 2. Desplegar la plantilla (manual o desde el pipeline)
+
+**Desde el pipeline (recomendado):** En cada push a la rama `labs-03`, el workflow ejecuta `aws cloudformation deploy` con la plantilla `Plantilla_CloudFormation_AWS.yml` antes de actualizar el código de la Lambda. La primera vez crea el stack; en ejecuciones siguientes solo aplica cambios si la plantilla cambió. No hace falta desplegar la plantilla a mano.
 
 **Manual (opcional):** Si prefieres crear el stack una vez desde tu máquina, desde la raíz del repo:
 
@@ -43,12 +47,12 @@ La plantilla crea en tu cuenta AWS:
 - Rol IAM con permisos de CloudWatch Logs y DynamoDB sobre esa tabla.
 - Función **Lambda** con runtime Node.js 24, variable de entorno `TABLE_NAME` y un handler inicial que devuelve **501** (código aún no desplegado).
 
-### 2. Secrets en GitHub
+### 3. Secrets en GitHub
 
 - **AWS_ACCESS_KEY** y **AWS_SECRET_KEY**: el usuario/rol debe tener permisos para **CloudFormation** (crear/actualizar stack), **Lambda** (update-function-code, invoke) y los recursos que crea la plantilla (DynamoDB, IAM). Si despliegas la plantilla desde el pipeline, son necesarios permisos de CloudFormation.
 - **FUNCTION_NAME** (opcional): nombre de la función. Si no lo pones, el workflow usa `lab03-1-function1`. Si usaste otro nombre en el parámetro del stack, define aquí el mismo.
 
-### 3. Ejecutar el lab
+### 4. Ejecutar el lab
 
 Haces **push a la rama `labs-03`**. El workflow:
 
