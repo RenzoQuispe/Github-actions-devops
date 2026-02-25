@@ -1,0 +1,148 @@
+# Workflow para desplegar Lab 03.2: Gestor de tareas (CloudFront, S3, API Gateway, Lambda, DynamoDB)
+
+name: Deploy Lab 03.2 - Task Manager
+
+on:
+  push:
+    branches:
+      - labs-03
+    paths:
+      - 'labs/labs-03-pipelines-github-cloud/lab-03.2/**'
+      - 'labs/labs-03-pipelines-github-cloud/lab-03.2/Plantilla_CloudFormation_AWS.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-2
+  STACK_NAME: lab03-2-tasks
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy CloudFormation stack (Lab 03.2)
+        run: |
+          aws cloudformation deploy \
+            --template-file labs/labs-03-pipelines-github-cloud/lab-03.2/Plantilla_CloudFormation_AWS.yml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --parameter-overrides StackNamePrefix=lab03-2 ApiFunctionName=lab03-2-api UsersTableName=lab03-2-users TasksTableName=lab03-2-tasks \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Get stack outputs
+        id: outputs
+        run: |
+          API_URL=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiURL'].OutputValue" \
+            --output text | tr -d '\n\r' | xargs)
+          BUCKET=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
+            --output text | tr -d '\n\r' | xargs)
+          DIST_ID=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendDistributionId'].OutputValue" \
+            --output text | tr -d '\n\r' | xargs)
+          # Fallback: si el output no existe, obtener el bucket por tipo de recurso
+          if [ -z "$BUCKET" ]; then
+            BUCKET=$(aws cloudformation list-stack-resources --region ${{ env.AWS_REGION }} \
+              --stack-name ${{ env.STACK_NAME }} \
+              --query "StackResourceSummaries[?ResourceType=='AWS::S3::Bucket'].PhysicalResourceId" \
+              --output text | tr '\t' '\n' | head -1 | tr -d '\n\r' | xargs)
+          fi
+          if [ -z "$BUCKET" ] || [ -z "$API_URL" ] || [ -z "$DIST_ID" ]; then
+            echo "::error::Stack outputs incompletos. BUCKET='$BUCKET' API_URL='$API_URL' DIST_ID='$DIST_ID'"
+            aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs" --output table
+            exit 1
+          fi
+          echo "api_url<<OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "$API_URL" >> $GITHUB_OUTPUT
+          echo "OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "bucket<<OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "$BUCKET" >> $GITHUB_OUTPUT
+          echo "OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "distribution_id<<OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "$DIST_ID" >> $GITHUB_OUTPUT
+          echo "OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "API URL: $API_URL"
+          echo "Bucket: $BUCKET"
+          echo "CloudFront ID: $DIST_ID"
+
+      - name: Install and zip Lambda (backend)
+        run: |
+          cd labs/labs-03-pipelines-github-cloud/lab-03.2/backend
+          npm install --omit=dev
+          zip -r $GITHUB_WORKSPACE/backend.zip .
+
+      - name: Deploy Lambda code
+        run: |
+          aws lambda update-function-code \
+            --function-name lab03-2-api \
+            --zip-file fileb://backend.zip
+          aws lambda wait function-updated --function-name lab03-2-api
+
+      - name: Setup Node for frontend
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: |
+          cd labs/labs-03-pipelines-github-cloud/lab-03.2/frontend
+          npm install
+
+      - name: Build frontend with API URL
+        run: |
+          API_URL=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiURL'].OutputValue" \
+            --output text)
+          echo "Building frontend with API URL: $API_URL"
+          cd labs/labs-03-pipelines-github-cloud/lab-03.2/frontend
+          echo "VITE_APP_API_URL=$API_URL" > .env.production
+          npm run build
+
+      - name: Upload frontend to S3
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
+            --output text)
+          [ -z "$BUCKET" ] && BUCKET=$(aws cloudformation list-stack-resources --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "StackResourceSummaries[?ResourceType=='AWS::S3::Bucket'].PhysicalResourceId" \
+            --output text | tr '\t' '\n' | head -1)
+          echo "Using bucket: $BUCKET"
+          aws s3 sync \
+            labs/labs-03-pipelines-github-cloud/lab-03.2/frontend/dist/ \
+            s3://$BUCKET/ \
+            --delete \
+            --cache-control "public, max-age=0, must-revalidate"
+
+      - name: Invalidate CloudFront cache
+        run: |
+          DIST_ID=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='FrontendDistributionId'].OutputValue" \
+            --output text)
+          echo "Invalidating CloudFront: $DIST_ID"
+          aws cloudfront create-invalidation \
+            --distribution-id "$DIST_ID" \
+            --paths "/*"
+
+      - name: Summary
+        run: |
+          echo "## Lab 03.2 desplegado" >> $GITHUB_STEP_SUMMARY
+          echo "- **Frontend (CloudFront):** Obtener URL con:" >> $GITHUB_STEP_SUMMARY
+          echo "  \`aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query \"Stacks[0].Outputs[?OutputKey=='FrontendURL'].OutputValue\" --output text\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **API:** ${{ steps.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY

@@ -5,10 +5,8 @@ const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME || 'lab03-1-table1';
 
-/**
- * Lambda que escribe y lista eventos en DynamoDB (ejemplo realista, Free Tier).
- * Payload: { action: "putEvent" | "listEvents", body?: { eventType, source, ... } }
- */
+
+// Lambda que escribe y lista eventos en DynamoDB
 exports.handler = async (event) => {
   const action = event && event.action;
   const body = event && event.body;

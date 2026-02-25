@@ -1,0 +1,335 @@
+# Lab 03.2: Gestor de tareas — Usuario (Browser) → CloudFront → S3 (React) | API Gateway → Lambda → DynamoDB
+# Arquitectura: Frontend en S3+CloudFront, Backend REST en API Gateway + Lambda, datos en DynamoDB.
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lab 03.2 - Task Manager: CloudFront, S3 (React), API Gateway, Lambda, DynamoDB (Users + Tasks).'
+
+Parameters:
+  StackNamePrefix:
+    Type: String
+    Default: lab03-2
+    Description: Prefijo para nombres de recursos (stack name será lab03-2-tasks)
+  ApiFunctionName:
+    Type: String
+    Default: lab03-2-api
+    Description: Nombre de la función Lambda del API
+  UsersTableName:
+    Type: String
+    Default: lab03-2-users
+    Description: Tabla DynamoDB de usuarios
+  TasksTableName:
+    Type: String
+    Default: lab03-2-tasks
+    Description: Tabla DynamoDB de tareas
+  DefaultUserPassword:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: '(Opcional) Contraseña para crear usuario inicial "usuario" si la tabla está vacía'
+
+Resources:
+  # --- DynamoDB: usuarios (varios usuarios, GSI por username) y tareas ---
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref UsersTableName
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: username
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: username-index
+          KeySchema:
+            - AttributeName: username
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  TasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TasksTableName
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: taskId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: taskId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: userId-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: taskId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 1
+            WriteCapacityUnits: 1
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  # --- IAM rol para Lambda ---
+  ApiLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${AWS::StackName}-api-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+
+  ApiLambdaLogsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${AWS::StackName}-lambda-logs
+      Roles:
+        - !Ref ApiLambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: '*'
+
+  ApiLambdaDynamoDBPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub ${AWS::StackName}-lambda-dynamodb
+      Roles:
+        - !Ref ApiLambdaRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:GetItem
+              - dynamodb:Scan
+              - dynamodb:Query
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:BatchGetItem
+            Resource:
+              - !GetAtt UsersTable.Arn
+              - !Sub
+                - '${Arn}/index/*'
+                - Arn: !GetAtt UsersTable.Arn
+              - !GetAtt TasksTable.Arn
+              - !Sub
+                - '${Arn}/index/*'
+                - Arn: !GetAtt TasksTable.Arn
+
+  # --- Lambda (API backend; código real lo despliega el pipeline) ---
+  ApiLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref ApiFunctionName
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Timeout: 30
+      Role: !GetAtt ApiLambdaRole.Arn
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          TASKS_TABLE: !Ref TasksTable
+          DEFAULT_USER_PASSWORD: !Ref DefaultUserPassword
+      Code:
+        ZipFile: |
+          exports.handler = async () => ({
+            statusCode: 501,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({ error: 'Backend no desplegado. Ejecuta el workflow (push a labs-03).' })
+          });
+
+  # --- API Gateway REST API (proxy a Lambda) ---
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub ${AWS::StackName}-api
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ApiRootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !GetAtt RestApi.RootResourceId
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambda.Arn}/invocations
+    DependsOn: ApiLambdaPermission
+
+  ApiProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: '{proxy+}'
+
+  ApiProxyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ApiProxyResource
+      HttpMethod: ANY
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambda.Arn}/invocations
+
+  ApiLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ApiLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiRootMethod
+      - ApiProxyMethod
+    Properties:
+      RestApiId: !Ref RestApi
+      StageName: prod
+
+  # --- S3 para frontend React ---
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::AccountId}-${StackNamePrefix}-frontend
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # --- CloudFront Origin Access Control (OAC) ---
+  FrontendOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${AWS::StackName}-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # --- CloudFront: origen S3 (frontend) ---
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Comment: !Sub ${AWS::StackName} frontend
+        Origins:
+          - Id: S3Frontend
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt FrontendOAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: S3Frontend
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+            Headers: []
+          Compress: true
+          DefaultTTL: 0
+          MaxTTL: 86400
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        PriceClass: PriceClass_100
+
+  # --- Permiso S3: solo CloudFront puede leer ---
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowCloudFront
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${FrontendBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}
+
+Outputs:
+  FrontendURL:
+    Description: URL del frontend (CloudFront)
+    Value: !Sub https://${FrontendDistribution.DomainName}
+    Export:
+      Name: !Sub ${AWS::StackName}-FrontendURL
+  FrontendDistributionId:
+    Description: ID de la distribución CloudFront (para invalidaciones)
+    Value: !Ref FrontendDistribution
+    Export:
+      Name: !Sub ${AWS::StackName}-FrontendDistributionId
+  ApiURL:
+    Description: URL base del API (usar en REACT_APP_API_URL)
+    Value: !Sub https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiURL
+  FrontendBucketName:
+    Description: Nombre del bucket S3 del frontend
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-FrontendBucket
+  ApiFunctionName:
+    Description: Nombre de la función Lambda del API
+    Value: !Ref ApiLambda
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiFunctionName
+  UsersTable:
+    Value: !Ref UsersTable
+  TasksTable:
+    Value: !Ref TasksTable

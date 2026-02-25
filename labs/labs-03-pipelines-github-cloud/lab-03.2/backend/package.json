@@ -1,0 +1,10 @@
+{
+  "name": "lab-03.2-api",
+  "version": "1.0.0",
+  "description": "API Gestor de tareas: login + CRUD, Lambda + DynamoDB",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0"
+  }
+}
