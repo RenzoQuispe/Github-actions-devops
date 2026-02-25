@@ -65,9 +65,15 @@ jobs:
             aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs" --output table
             exit 1
           fi
-          echo "api_url=$API_URL" >> $GITHUB_OUTPUT
-          echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
-          echo "distribution_id=$DIST_ID" >> $GITHUB_OUTPUT
+          echo "api_url<<OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "$API_URL" >> $GITHUB_OUTPUT
+          echo "OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "bucket<<OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "$BUCKET" >> $GITHUB_OUTPUT
+          echo "OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "distribution_id<<OUTPUT_EOF" >> $GITHUB_OUTPUT
+          echo "$DIST_ID" >> $GITHUB_OUTPUT
+          echo "OUTPUT_EOF" >> $GITHUB_OUTPUT
           echo "API URL: $API_URL"
           echo "Bucket: $BUCKET"
           echo "CloudFront ID: $DIST_ID"
