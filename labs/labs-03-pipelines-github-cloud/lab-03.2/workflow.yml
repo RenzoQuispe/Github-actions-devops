@@ -42,27 +42,27 @@ jobs:
       - name: Get stack outputs
         id: outputs
         run: |
-          API_URL=$(aws cloudformation describe-stacks \
+          API_URL=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
             --stack-name ${{ env.STACK_NAME }} \
             --query "Stacks[0].Outputs[?OutputKey=='ApiURL'].OutputValue" \
-            --output text)
-          BUCKET=$(aws cloudformation describe-stacks \
+            --output text | tr -d '\n\r' | xargs)
+          BUCKET=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
             --stack-name ${{ env.STACK_NAME }} \
             --query "Stacks[0].Outputs[?OutputKey=='FrontendBucketName'].OutputValue" \
-            --output text)
-          DIST_ID=$(aws cloudformation describe-stacks \
+            --output text | tr -d '\n\r' | xargs)
+          DIST_ID=$(aws cloudformation describe-stacks --region ${{ env.AWS_REGION }} \
             --stack-name ${{ env.STACK_NAME }} \
             --query "Stacks[0].Outputs[?OutputKey=='FrontendDistributionId'].OutputValue" \
-            --output text)
+            --output text | tr -d '\n\r' | xargs)
           # Fallback: si el output no existe, obtener el bucket por tipo de recurso
           if [ -z "$BUCKET" ]; then
-            BUCKET=$(aws cloudformation list-stack-resources \
+            BUCKET=$(aws cloudformation list-stack-resources --region ${{ env.AWS_REGION }} \
               --stack-name ${{ env.STACK_NAME }} \
               --query "StackResourceSummaries[?ResourceType=='AWS::S3::Bucket'].PhysicalResourceId" \
-              --output text | tr '\t' '\n' | head -1)
+              --output text | tr '\t' '\n' | head -1 | tr -d '\n\r' | xargs)
           fi
           if [ -z "$BUCKET" ] || [ -z "$API_URL" ] || [ -z "$DIST_ID" ]; then
-            echo "::error::Stack outputs incompletos. BUCKET=$BUCKET API_URL=$API_URL DIST_ID=$DIST_ID"
+            echo "::error::Stack outputs incompletos. BUCKET='$BUCKET' API_URL='$API_URL' DIST_ID='$DIST_ID'"
             aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs" --output table
             exit 1
           fi

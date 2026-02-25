@@ -27,7 +27,7 @@ Crea una política en AWS a partir de `IAM_Policies_AWS.json` y asígnala al usu
 ```bash
 aws cloudformation deploy \
   --template-file plantillas-aws/lab-03.1-full.yml \
-  --stack-name lab03-events \
+  --stack-name lab03-1-events \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
@@ -36,7 +36,7 @@ Parámetros opcionales (por defecto: `FunctionName=lab03-1-function1`, `TableNam
 ```bash
 aws cloudformation deploy \
   --template-file plantillas-aws/lab-03.1-full.yml \
-  --stack-name lab03-events \
+  --stack-name lab03-1-events \
   --parameter-overrides FunctionName=mi-lambda-lab03 TableName=mi-tabla-eventos \
   --capabilities CAPABILITY_NAMED_IAM
 ```
