@@ -53,6 +53,18 @@ jobs:
             --stack-name ${{ env.STACK_NAME }} \
             --query "Stacks[0].Outputs[?OutputKey=='FrontendDistributionId'].OutputValue" \
             --output text)
+          # Fallback: si el output no existe, obtener el bucket por tipo de recurso
+          if [ -z "$BUCKET" ]; then
+            BUCKET=$(aws cloudformation list-stack-resources \
+              --stack-name ${{ env.STACK_NAME }} \
+              --query "StackResourceSummaries[?ResourceType=='AWS::S3::Bucket'].PhysicalResourceId" \
+              --output text | tr '\t' '\n' | head -1)
+          fi
+          if [ -z "$BUCKET" ] || [ -z "$API_URL" ] || [ -z "$DIST_ID" ]; then
+            echo "::error::Stack outputs incompletos. BUCKET=$BUCKET API_URL=$API_URL DIST_ID=$DIST_ID"
+            aws cloudformation describe-stacks --stack-name ${{ env.STACK_NAME }} --query "Stacks[0].Outputs" --output table
+            exit 1
+          fi
           echo "api_url=$API_URL" >> $GITHUB_OUTPUT
           echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
           echo "distribution_id=$DIST_ID" >> $GITHUB_OUTPUT
