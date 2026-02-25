@@ -28,7 +28,7 @@ jobs:
       run: |
         aws cloudformation deploy \
           --template-file labs/labs-03-pipelines-github-cloud/lab-03.1/Plantilla_CloudFormation_AWS.yml \
-          --stack-name lab03-events \
+          --stack-name lab03-1-events \
           --parameter-overrides FunctionName=$LAMBDA_FUNCTION_NAME TableName=$TABLE_NAME \
           --capabilities CAPABILITY_NAMED_IAM \
           --no-fail-on-empty-changeset

@@ -237,6 +237,16 @@ exports.handler = async (event) => {
       };
     }
 
+    // GET /health — healthcheck sin autenticación
+    if (method === 'GET' && (parts[0] === 'health' || path.endsWith('/health'))) {
+      return json({
+        ok: true,
+        service: 'lab03-2-api',
+        timestamp: new Date().toISOString(),
+        env: { usersTable: !!USERS_TABLE, tasksTable: !!TASKS_TABLE },
+      });
+    }
+
     // POST /login
     if (method === 'POST' && (parts[0] === 'login' || path.endsWith('/login'))) {
       return await postLogin(body);

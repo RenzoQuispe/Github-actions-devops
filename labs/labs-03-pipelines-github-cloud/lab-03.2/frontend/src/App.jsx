@@ -2,6 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 const API_URL = import.meta.env.VITE_APP_API_URL || '';
 
+// Log de conexión al API (visible en consola del navegador)
+if (typeof window !== 'undefined') {
+  console.log('[Lab 03.2] API base URL:', API_URL || '(vacío — revisar VITE_APP_API_URL en el build)');
+  if (!API_URL) console.warn('[Lab 03.2] Sin API URL las peticiones fallarán.');
+}
+
 const TOKEN_KEY = 'lab03-2-token';
 const USERNAME_KEY = 'lab03-2-username';
 
@@ -37,8 +43,14 @@ async function api(path, options = {}) {
   };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
+  if (typeof window !== 'undefined') {
+    console.log('[Lab 03.2] API request:', options.method || 'GET', url);
+  }
   const res = await fetch(url, { ...options, headers });
   const data = await res.json().catch(() => ({}));
+  if (typeof window !== 'undefined') {
+    console.log('[Lab 03.2] API response:', res.status, path, res.ok ? '(OK)' : '(error)', data?.error ? data : '');
+  }
   if (!res.ok) throw { status: res.status, ...data };
   return data;
 }
@@ -333,6 +345,20 @@ function Tasks({ username, onLogout }) {
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(!!getToken());
   const [showRegister, setShowRegister] = useState(false);
+
+  // Comprobar conexión al API al cargar
+  useEffect(() => {
+    if (!API_URL || typeof window === 'undefined') return;
+    const url = (API_URL.replace(/\/$/, '') + '/health').replace(/\/\/+/g, '/');
+    fetch(url)
+      .then((r) => r.json().catch(() => ({})))
+      .then((data) => {
+        console.log('[Lab 03.2] Healthcheck OK — backend alcanzable:', data);
+      })
+      .catch((err) => {
+        console.error('[Lab 03.2] Healthcheck falló — no se puede conectar al API:', err.message, 'URL:', url);
+      });
+  }, []);
 
   if (loggedIn) {
     return (
