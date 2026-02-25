@@ -36,7 +36,9 @@ function clearStoredUser() {
 }
 
 async function api(path, options = {}) {
-  const url = (API_URL.replace(/\/$/, '') + '/' + path.replace(/^\//, '')).replace(/\/\/+/g, '/');
+  const base = API_URL.replace(/\/$/, '');
+  const segment = path.replace(/^\//, '');
+  const url = segment ? `${base}/${segment}` : base;
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers,
@@ -83,9 +85,6 @@ function Login({ onLogin, onGoRegister }) {
     <div className="app">
       <div className="card">
         <h1>Gestor de tareas</h1>
-        <p style={{ textAlign: 'center', color: '#888', fontSize: '0.875rem', marginBottom: '1rem' }}>
-          Lab 03.2 — Inicia sesión
-        </p>
         <form onSubmit={submit}>
           <div className="form-group">
             <label>Usuario</label>
@@ -349,7 +348,8 @@ export default function App() {
   // Comprobar conexión al API al cargar
   useEffect(() => {
     if (!API_URL || typeof window === 'undefined') return;
-    const url = (API_URL.replace(/\/$/, '') + '/health').replace(/\/\/+/g, '/');
+    const base = API_URL.replace(/\/$/, '');
+    const url = `${base}/health`;
     fetch(url)
       .then((r) => r.json().catch(() => ({})))
       .then((data) => {
